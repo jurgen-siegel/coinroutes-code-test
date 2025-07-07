@@ -37,24 +37,19 @@ export function DraggableDashboard() {
     });
 
     // Handle drag start
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (swapyRef.current as any).onSwapStart?.(() => {
       setIsDragging(true);
     });
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (swapyRef.current as any).onSwap((_event: unknown) => {
       // Widget swap handled
     });
 
     // Fix for lag issues - update swapy after swap completes
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (swapyRef.current as any).onSwapEnd((_event: unknown) => {
       setIsDragging(false);
 
       // Refresh chart theme and resize after drag operation
       requestAnimationFrame(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (swapyRef.current as any)?.update();
 
         // Fix chart theme and sizing after DOM manipulation
@@ -86,7 +81,6 @@ export function DraggableDashboard() {
         document.body.style.overflow = 'auto';
       }
       if (swapyRef.current) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (swapyRef.current as any).destroy?.();
         swapyRef.current = null;
       }

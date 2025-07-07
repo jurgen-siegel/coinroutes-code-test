@@ -206,16 +206,12 @@ export function OrderBook() {
     calculateTotal
   } = useOrderBook(selectedProduct);
 
-  /**
-   * Extract base currency from product ID
-   */
+  // Extract base currency from product ID
   const baseCurrency = useMemo(() => {
     return selectedProduct.split('-')[0];
   }, [selectedProduct]);
 
-  /**
-   * Aggregate order book data based on current price increment setting
-   */
+  // Aggregate order book data based on current price increment setting
   const aggregatedOrderBook = useMemo(() => {
     return {
       bids: aggregateOrderBookData(orderBook.bids, true),
@@ -224,9 +220,7 @@ export function OrderBook() {
     };
   }, [orderBook, aggregateOrderBookData]);
 
-  /**
-   * Calculate maximum volume for relative bar sizing using aggregated data
-   */
+  // Calculate maximum volume for relative bar sizing using aggregated data
   const maxSize = useMemo(() => {
     const maxBidSize =
       aggregatedOrderBook.bids.length > 0
