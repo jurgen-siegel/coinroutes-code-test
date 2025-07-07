@@ -13,6 +13,6 @@ const Skeleton = React.forwardRef<SkeletonElement, SkeletonProps>(
     />
   )
 );
-Skeleton.displayName = 'SettingsSections';
+Skeleton.displayName = 'Skeleton';
 
 export { Skeleton };

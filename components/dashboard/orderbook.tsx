@@ -27,6 +27,8 @@ import { useProductSelection } from '@/hooks/use-crypto-pair-selection';
 import { useOrderBook } from '@/hooks/use-websocket-provider';
 import { OrderBookEntry, OrderBookTableProps } from '@/types/order-book';
 
+import { DepthChart } from './depth-chart';
+
 /**
  * Loading skeleton row component
  */
@@ -262,6 +264,14 @@ export function OrderBook() {
 
   return (
     <div className="flex size-full flex-col">
+      {/* Depth Chart */}
+      <div className="h-[200px] border-b">
+        <DepthChart
+          orderBook={aggregatedOrderBook}
+          isConnected={isConnected}
+        />
+      </div>
+
       <div className="min-h-0 flex-1">
         <div className="h-full overflow-hidden">
           <ResizablePanelGroup
