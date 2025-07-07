@@ -11,36 +11,26 @@ import {
   useState
 } from 'react';
 
-import { DEFAULT_LOCALE } from '@/lib/i18n/locale';
+import { WebSocketClient } from '@/lib/websocket/client';
+import { logger } from '@/lib/websocket/logger';
+import {
+  calculateTotal,
+  formatPrice,
+  formatSize,
+  getQuoteCurrency
+} from '@/lib/websocket/order-book-utils';
+import type {
+  OrderBookData,
+  PriceUpdateCallback,
+  WebSocketContextType,
+  WebSocketError,
+  WebSocketState
+} from '@/types/websocket';
 
-interface OrderBookEntry {
-  price: string;
-  size: string;
-  exchange?: string;
-}
-
-interface OrderBookData {
-  bids: OrderBookEntry[];
-  asks: OrderBookEntry[];
-  lastUpdated: Date | null;
-}
-
-interface WebSocketState {
-  isConnected: boolean;
-  isConnecting: boolean;
-  error: string | null;
-  orderBooks: Record<string, OrderBookData>;
-}
-
-interface WebSocketContextType extends WebSocketState {
-  subscribeToProduct: (productId: string) => void;
-  unsubscribeFromProduct: (productId: string) => void;
-  onPriceUpdate: (callback: (symbol: string, price: number) => void) => void;
-  offPriceUpdate: (callback: (symbol: string, price: number) => void) => void;
-}
-
+// WebSocket context for managing real-time data connections
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
 
+// WebSocket provider component that manages connection state and subscriptions
 export function WebSocketProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WebSocketState>({
     isConnected: false,
@@ -49,331 +39,125 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     orderBooks: {}
   });
 
-  const wsRef = useRef<WebSocket | null>(null);
-  const subscribedProducts = useRef<Set<string>>(new Set());
-  const reconnectAttempts = useRef(0);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const maxReconnectAttempts = 5;
-  const priceUpdateCallbacks = useRef<
-    Set<(symbol: string, price: number) => void>
-  >(new Set());
+  const clientRef = useRef<WebSocketClient | null>(null);
+  const isInitializedRef = useRef(false);
+  const pendingOperationsRef = useRef<(() => void)[]>([]);
 
-  const onPriceUpdate = useCallback(
-    (callback: (symbol: string, price: number) => void) => {
-      priceUpdateCallbacks.current.add(callback);
-    },
-    []
-  );
+  // Initialize WebSocket client
+  useEffect(() => {
+    const client = new WebSocketClient();
+    clientRef.current = client;
 
-  const offPriceUpdate = useCallback(
-    (callback: (symbol: string, price: number) => void) => {
-      priceUpdateCallbacks.current.delete(callback);
-    },
-    []
-  );
-
-  const connect = useCallback(() => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      return;
-    }
-
-    setState((prev) => ({ ...prev, isConnecting: true, error: null }));
-
-    try {
-      const ws = new WebSocket('wss://advanced-trade-ws.coinbase.com');
-      wsRef.current = ws;
-
-      ws.onopen = () => {
-        setState((prev) => ({
-          ...prev,
-          isConnected: true,
-          isConnecting: false
-        }));
-        reconnectAttempts.current = 0;
-
-        // Resubscribe to all products
-        if (subscribedProducts.current.size > 0) {
-          const subscribeMessage = {
-            type: 'subscribe',
-            product_ids: Array.from(subscribedProducts.current),
-            channel: 'level2'
-          };
-
-          ws.send(JSON.stringify(subscribeMessage));
-        }
-      };
-
-      ws.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-
-          if (data.channel === 'l2_data' && data.events) {
-            data.events.forEach((event: unknown) => {
-              const eventData = event as {
-                product_id?: string;
-                type?: string;
-                updates?: Array<{
-                  side: string;
-                  price_level: string;
-                  new_quantity: string;
-                  exchange?: string;
-                }>;
-              };
-
-              const productId = eventData.product_id;
-
-              if (!productId || !subscribedProducts.current.has(productId)) {
-                return;
-              }
-
-              if (eventData.type === 'snapshot') {
-                const bids = (eventData.updates || [])
-                  .filter((update) => update.side === 'bid')
-                  .map((update) => ({
-                    price: update.price_level,
-                    size: update.new_quantity,
-                    exchange: update.exchange || 'Coinbase'
-                  }))
-                  .sort(
-                    (a: OrderBookEntry, b: OrderBookEntry) =>
-                      parseFloat(b.price) - parseFloat(a.price)
-                  )
-                  .slice(0, 10);
-
-                const asks = (eventData.updates || [])
-                  .filter((update) => update.side === 'offer')
-                  .map((update) => ({
-                    price: update.price_level,
-                    size: update.new_quantity,
-                    exchange: update.exchange || 'Coinbase'
-                  }))
-                  .sort(
-                    (a: OrderBookEntry, b: OrderBookEntry) =>
-                      parseFloat(a.price) - parseFloat(b.price)
-                  )
-                  .slice(0, 10);
-
-                setState((prev) => ({
-                  ...prev,
-                  orderBooks: {
-                    ...prev.orderBooks,
-                    [productId]: { bids, asks, lastUpdated: new Date() }
-                  }
-                }));
-
-                // Notify price update callbacks
-                if (bids.length > 0 && asks.length > 0) {
-                  const bestBid = parseFloat(bids[0].price);
-                  const bestAsk = parseFloat(asks[0].price);
-                  const midPrice = (bestBid + bestAsk) / 2;
-
-                  priceUpdateCallbacks.current.forEach((callback) => {
-                    callback(productId, midPrice);
-                  });
-                }
-              } else if (eventData.type === 'update') {
-                setState((prev) => {
-                  const currentOrderBook = prev.orderBooks[productId];
-                  if (!currentOrderBook) {
-                    return prev;
-                  }
-
-                  const newBids = [...currentOrderBook.bids];
-                  const newAsks = [...currentOrderBook.asks];
-
-                  (eventData.updates || []).forEach((update) => {
-                    const entry = {
-                      price: update.price_level,
-                      size: update.new_quantity,
-                      exchange: update.exchange || 'Coinbase'
-                    };
-
-                    if (update.side === 'bid') {
-                      const existingIndex = newBids.findIndex(
-                        (bid) => bid.price === entry.price
-                      );
-                      if (parseFloat(entry.size) === 0) {
-                        if (existingIndex !== -1) {
-                          newBids.splice(existingIndex, 1);
-                        }
-                      } else {
-                        if (existingIndex !== -1) {
-                          newBids[existingIndex] = entry;
-                        } else {
-                          newBids.push(entry);
-                        }
-                      }
-                    } else if (update.side === 'offer') {
-                      const existingIndex = newAsks.findIndex(
-                        (ask) => ask.price === entry.price
-                      );
-                      if (parseFloat(entry.size) === 0) {
-                        if (existingIndex !== -1) {
-                          newAsks.splice(existingIndex, 1);
-                        }
-                      } else {
-                        if (existingIndex !== -1) {
-                          newAsks[existingIndex] = entry;
-                        } else {
-                          newAsks.push(entry);
-                        }
-                      }
-                    }
-                  });
-
-                  newBids.sort(
-                    (a, b) => parseFloat(b.price) - parseFloat(a.price)
-                  );
-                  newAsks.sort(
-                    (a, b) => parseFloat(a.price) - parseFloat(b.price)
-                  );
-
-                  const updatedOrderBook = {
-                    bids: newBids.slice(0, 10),
-                    asks: newAsks.slice(0, 10),
-                    lastUpdated: new Date()
-                  };
-
-                  // Notify price update callbacks for updates too
-                  if (
-                    updatedOrderBook.bids.length > 0 &&
-                    updatedOrderBook.asks.length > 0
-                  ) {
-                    const bestBid = parseFloat(updatedOrderBook.bids[0].price);
-                    const bestAsk = parseFloat(updatedOrderBook.asks[0].price);
-                    const midPrice = (bestBid + bestAsk) / 2;
-
-                    priceUpdateCallbacks.current.forEach((callback) => {
-                      callback(productId, midPrice);
-                    });
-                  }
-
-                  return {
-                    ...prev,
-                    orderBooks: {
-                      ...prev.orderBooks,
-                      [productId]: updatedOrderBook
-                    }
-                  };
-                });
-              }
-            });
-          }
-        } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
-        }
-      };
-
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        setState((prev) => ({ ...prev, error: 'WebSocket connection error' }));
-      };
-
-      ws.onclose = (event) => {
-        setState((prev) => ({
-          ...prev,
-          isConnected: false,
-          isConnecting: false
-        }));
-        wsRef.current = null;
-
-        // Attempt to reconnect if not a normal closure
-        if (
-          event.code !== 1000 &&
-          reconnectAttempts.current < maxReconnectAttempts
-        ) {
-          const delay = Math.min(
-            1000 * Math.pow(2, reconnectAttempts.current),
-            30000
-          );
-
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectAttempts.current++;
-            connect();
-          }, delay);
-        } else if (reconnectAttempts.current >= maxReconnectAttempts) {
-          setState((prev) => ({
-            ...prev,
-            error: 'Max reconnection attempts reached'
-          }));
-        }
-      };
-    } catch (error) {
+    // Set up event handlers
+    const handleStateChange = (clientState: WebSocketState) => {
       setState((prev) => ({
         ...prev,
-        error: `Failed to create connection: ${(error as Error).message}`,
-        isConnecting: false
+        isConnected: clientState.isConnected,
+        isConnecting: clientState.isConnecting,
+        error: clientState.error
       }));
-    }
-  }, []);
-
-  const subscribeToProduct = useCallback((productId: string) => {
-    if (subscribedProducts.current.has(productId)) {
-      return;
-    }
-
-    subscribedProducts.current.add(productId);
-
-    // Initialize empty orderbook
-    setState((prev) => ({
-      ...prev,
-      orderBooks: {
-        ...prev.orderBooks,
-        [productId]: { bids: [], asks: [], lastUpdated: null }
-      }
-    }));
-
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      const subscribeMessage = {
-        type: 'subscribe',
-        product_ids: [productId],
-        channel: 'level2'
-      };
-
-      wsRef.current.send(JSON.stringify(subscribeMessage));
-    }
-  }, []);
-
-  const unsubscribeFromProduct = useCallback((productId: string) => {
-    if (!subscribedProducts.current.has(productId)) {
-      return;
-    }
-
-    subscribedProducts.current.delete(productId);
-
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      const unsubscribeMessage = {
-        type: 'unsubscribe',
-        product_ids: [productId],
-        channel: 'level2'
-      };
-
-      wsRef.current.send(JSON.stringify(unsubscribeMessage));
-    }
-
-    // Remove orderbook data
-    setState((prev) => {
-      const newOrderBooks = { ...prev.orderBooks };
-      delete newOrderBooks[productId];
-      return { ...prev, orderBooks: newOrderBooks };
-    });
-  }, []);
-
-  useEffect(() => {
-    connect();
-
-    return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      if (wsRef.current) {
-        wsRef.current.close(1000, 'Normal closure');
-      }
     };
-  }, [connect]);
 
-  // Memoize the context value to prevent unnecessary re-renders
-  const contextValue = useMemo(
+    const handleOrderBookUpdate = (
+      productId: string,
+      orderBook: OrderBookData
+    ) => {
+      setState((prev) => ({
+        ...prev,
+        orderBooks: {
+          ...prev.orderBooks,
+          [productId]: orderBook
+        }
+      }));
+    };
+
+    const handleError = (error: WebSocketError) => {
+      logger.error('WebSocket error received', undefined, { error });
+    };
+
+    // Register event handlers
+    client.on('state-change', handleStateChange);
+    client.on('order-book-update', handleOrderBookUpdate);
+    client.on('error', handleError);
+
+    // Connect to WebSocket
+    client.connect();
+
+    // Mark as initialized and execute pending operations
+    isInitializedRef.current = true;
+    const operations = pendingOperationsRef.current;
+    pendingOperationsRef.current = [];
+    operations.forEach((operation) => operation());
+
+    // Cleanup on unmount
+    return () => {
+      client.off('state-change', handleStateChange);
+      client.off('order-book-update', handleOrderBookUpdate);
+      client.off('error', handleError);
+      client.disconnect();
+      isInitializedRef.current = false;
+    };
+  }, []);
+
+  // Helper function to execute operations when client is ready
+  const executeWhenReady = useCallback((operation: () => void) => {
+    if (isInitializedRef.current && clientRef.current) {
+      operation();
+    } else {
+      pendingOperationsRef.current.push(operation);
+    }
+  }, []);
+
+  // Subscribe to product updates
+  const subscribeToProduct = useCallback(
+    (productId: string) => {
+      executeWhenReady(() => {
+        if (clientRef.current) {
+          clientRef.current.subscribeToProduct(productId);
+        }
+      });
+    },
+    [executeWhenReady]
+  );
+
+  // Unsubscribe from product updates
+  const unsubscribeFromProduct = useCallback(
+    (productId: string) => {
+      executeWhenReady(() => {
+        if (clientRef.current) {
+          clientRef.current.unsubscribeFromProduct(productId);
+        }
+      });
+    },
+    [executeWhenReady]
+  );
+
+  // Register price update callback
+  const onPriceUpdate = useCallback(
+    (callback: PriceUpdateCallback) => {
+      executeWhenReady(() => {
+        if (clientRef.current) {
+          clientRef.current.addPriceUpdateCallback(callback);
+        }
+      });
+    },
+    [executeWhenReady]
+  );
+
+  // Remove price update callback
+  const offPriceUpdate = useCallback(
+    (callback: PriceUpdateCallback) => {
+      executeWhenReady(() => {
+        if (clientRef.current) {
+          clientRef.current.removePriceUpdateCallback(callback);
+        }
+      });
+    },
+    [executeWhenReady]
+  );
+
+  // Memoize context value to prevent unnecessary re-renders
+  const contextValue = useMemo<WebSocketContextType>(
     () => ({
       ...state,
       subscribeToProduct,
@@ -397,15 +181,33 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useWebSocket() {
+// Hook to access WebSocket context
+// @throws Error if used outside of WebSocketProvider
+export function useWebSocket(): WebSocketContextType {
   const context = useContext(WebSocketContext);
+
   if (!context) {
     throw new Error('useWebSocket must be used within a WebSocketProvider');
   }
+
   return context;
 }
 
-export function useOrderBook(productId: string) {
+// Interface for order book hook return value
+export interface UseOrderBookReturn {
+  orderBook: OrderBookData;
+  isConnected: boolean;
+  isConnecting: boolean;
+  error: WebSocketError | null;
+  formatPrice: (price: string) => string;
+  formatSize: (size: string) => string;
+  calculateTotal: (price: string, size: string) => string;
+}
+
+// Hook for managing order book subscriptions and formatting
+// @param productId - Product ID to subscribe to (e.g., 'BTC-USD')
+// @returns Order book data and formatting utilities
+export function useOrderBook(productId: string): UseOrderBookReturn {
   const {
     orderBooks,
     isConnected,
@@ -415,65 +217,50 @@ export function useOrderBook(productId: string) {
     unsubscribeFromProduct
   } = useWebSocket();
 
+  // Manage subscription lifecycle
   useEffect(() => {
+    if (!productId) {
+      logger.warn('Product ID is required for order book subscription');
+      return;
+    }
+
+    logger.debug('Subscribing to order book', { productId });
     subscribeToProduct(productId);
-    return () => unsubscribeFromProduct(productId);
+
+    return () => {
+      logger.debug('Unsubscribing from order book', { productId });
+      unsubscribeFromProduct(productId);
+    };
   }, [productId, subscribeToProduct, unsubscribeFromProduct]);
 
-  const orderBook = orderBooks[productId] || {
-    bids: [],
-    asks: [],
-    lastUpdated: null
-  };
-
-  const getQuoteCurrency = useCallback((productId: string) => {
-    return productId.split('-')[1];
-  }, []);
-
-  const formatPrice = useCallback(
-    (price: string) => {
-      const num = parseFloat(price);
-      const quoteCurrency = getQuoteCurrency(productId);
-
-      if (quoteCurrency === 'USD') {
-        return new Intl.NumberFormat(DEFAULT_LOCALE, {
-          style: 'currency',
-          currency: 'USD',
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        }).format(num);
-      } else {
-        return `${num.toFixed(2)} ${quoteCurrency}`;
+  // Get order book data or default empty state
+  const orderBook = useMemo<OrderBookData>(() => {
+    return (
+      orderBooks[productId] || {
+        bids: [],
+        asks: [],
+        lastUpdated: null
       }
-    },
-    [productId, getQuoteCurrency]
+    );
+  }, [orderBooks, productId]);
+
+  // Memoize quote currency for formatting
+  const quoteCurrency = useMemo(() => getQuoteCurrency(productId), [productId]);
+
+  // Memoize formatting functions
+  const formatPriceForProduct = useCallback(
+    (price: string) => formatPrice(price, quoteCurrency),
+    [quoteCurrency]
   );
 
-  const formatSize = useCallback((size: string) => {
-    const num = parseFloat(size);
-    return new Intl.NumberFormat(DEFAULT_LOCALE, {
-      minimumFractionDigits: 4,
-      maximumFractionDigits: 8
-    }).format(num);
-  }, []);
+  const formatSizeForProduct = useCallback(
+    (size: string) => formatSize(size),
+    []
+  );
 
-  const calculateTotal = useCallback(
-    (price: string, size: string) => {
-      const total = parseFloat(price) * parseFloat(size);
-      const quoteCurrency = getQuoteCurrency(productId);
-
-      if (quoteCurrency === 'USD') {
-        return new Intl.NumberFormat(DEFAULT_LOCALE, {
-          style: 'currency',
-          currency: 'USD',
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        }).format(total);
-      } else {
-        return `${total.toFixed(2)} ${quoteCurrency}`;
-      }
-    },
-    [productId, getQuoteCurrency]
+  const calculateTotalForProduct = useCallback(
+    (price: string, size: string) => calculateTotal(price, size, quoteCurrency),
+    [quoteCurrency]
   );
 
   return {
@@ -481,8 +268,8 @@ export function useOrderBook(productId: string) {
     isConnected,
     isConnecting,
     error,
-    formatPrice,
-    formatSize,
-    calculateTotal
+    formatPrice: formatPriceForProduct,
+    formatSize: formatSizeForProduct,
+    calculateTotal: calculateTotalForProduct
   };
 }

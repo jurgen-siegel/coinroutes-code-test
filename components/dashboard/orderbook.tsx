@@ -40,7 +40,7 @@ const LoadingRow = () => (
     <TableCell className="px-4 text-xs">
       <Skeleton className="h-4 w-full" />
     </TableCell>
-    <TableCell className="px-4 text-xs">
+    <TableCell className="hidden px-4 text-xs sm:table-cell">
       <Skeleton className="h-4 w-full" />
     </TableCell>
   </TableRow>
@@ -57,7 +57,7 @@ const EmptyOrderRow = () => (
     <TableCell className="truncate px-4 text-right text-xs text-muted-foreground">
       --
     </TableCell>
-    <TableCell className="truncate px-4 text-right text-xs text-muted-foreground">
+    <TableCell className="hidden truncate px-4 text-right text-xs text-muted-foreground sm:table-cell">
       --
     </TableCell>
   </TableRow>
@@ -108,7 +108,7 @@ const OrderRow = ({
       <TableCell className="relative z-10 truncate px-4 text-right font-mono text-xs">
         {formatSize(order.size)}
       </TableCell>
-      <TableCell className="relative z-10 truncate px-4 text-right text-xs">
+      <TableCell className="relative z-10 hidden truncate px-4 text-right text-xs sm:table-cell">
         {calculateTotal(order.price, order.size)}
       </TableCell>
     </TableRow>
@@ -167,16 +167,18 @@ const OrderBookTable = ({
   ]);
 
   return (
-    <div className="flex-1 overflow-hidden">
+    <div className="min-h-0 flex-1 overflow-hidden">
       <div className="h-full overflow-y-auto overflow-x-hidden">
         <Table className="w-full table-fixed">
           <TableHeader className="sticky top-0 bg-background">
             <TableRow>
-              <TableHead className="w-[30%] px-4 text-xs">Price</TableHead>
-              <TableHead className="w-[35%] px-4 text-right text-xs">
+              <TableHead className="w-1/2 px-4 text-xs sm:w-[30%]">
+                Price
+              </TableHead>
+              <TableHead className="w-1/2 px-4 text-right text-xs sm:w-[35%]">
                 Size ({baseCurrency})
               </TableHead>
-              <TableHead className="w-[35%] px-4 text-right text-xs">
+              <TableHead className="hidden px-4 text-right text-xs sm:table-cell sm:w-[35%]">
                 Total
               </TableHead>
             </TableRow>
@@ -264,14 +266,15 @@ export function OrderBook() {
 
   return (
     <div className="flex size-full flex-col">
-      {/* Depth Chart */}
-      <div className="h-[200px] border-b">
+      {/* Depth Chart - Hidden on mobile, shown on sm screens and up */}
+      <div className="hidden shrink-0 border-b sm:block sm:h-[175px]">
         <DepthChart
           orderBook={aggregatedOrderBook}
           isConnected={isConnected}
         />
       </div>
 
+      {/* Orderbook Tables */}
       <div className="min-h-0 flex-1">
         <div className="h-full overflow-hidden">
           <ResizablePanelGroup
@@ -281,7 +284,7 @@ export function OrderBook() {
             {/* Buy Orders (Bids) */}
             <ResizablePanel
               defaultSize={50}
-              className="flex h-full flex-col"
+              className="flex h-full min-h-0 flex-col"
             >
               <OrderBookTable
                 orders={aggregatedOrderBook.bids}
@@ -301,7 +304,7 @@ export function OrderBook() {
             {/* Sell Orders (Asks) */}
             <ResizablePanel
               defaultSize={50}
-              className="flex h-full flex-col"
+              className="flex h-full min-h-0 flex-col"
             >
               <OrderBookTable
                 orders={aggregatedOrderBook.asks}

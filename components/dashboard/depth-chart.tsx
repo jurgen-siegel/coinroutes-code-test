@@ -112,26 +112,9 @@ export function DepthChart({ orderBook, isConnected }: DepthChartProps) {
   if (stepData.length === 0) {
     return (
       <div className="flex size-full flex-col">
-        {/* Title Skeleton */}
-        <div className="mb-2 text-center">
-          <Skeleton className="mx-auto h-4 w-24" />
-        </div>
-
         {/* Chart Skeleton */}
         <div className="min-h-0 flex-1 p-5">
           <Skeleton className="size-full" />
-        </div>
-
-        {/* Legend Skeleton */}
-        <div className="mt-4 flex items-center justify-center gap-6">
-          <div className="flex items-center gap-2">
-            <Skeleton className="size-3 rounded-full" />
-            <Skeleton className="h-4 w-20" />
-          </div>
-          <div className="flex items-center gap-2">
-            <Skeleton className="size-3 rounded-full" />
-            <Skeleton className="h-4 w-16" />
-          </div>
         </div>
       </div>
     );
@@ -141,14 +124,10 @@ export function DepthChart({ orderBook, isConnected }: DepthChartProps) {
     <div className="flex size-full flex-col">
       {/* Step Chart */}
       <div className="min-h-0 flex-1">
-        <div className="mb-2 text-center">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Depth Chart
-          </h3>
-        </div>
         <ChartContainer
           config={chartConfig}
           className="size-full"
+          height={200}
         >
           <AreaChart
             data={stepData}

@@ -5,7 +5,7 @@ import type { Metadata, Viewport } from 'next';
 import { Inter } from 'next/font/google';
 
 import { Providers } from '@/app/providers';
-import { Navbar } from '@/components/dashboard/navbar';
+import { Navbar } from '@/components/ui/navbar';
 import { Toaster } from '@/components/ui/sonner';
 import { AppInfo } from '@/constants/app-info';
 import { getBaseUrl } from '@/lib/urls/get-base-url';

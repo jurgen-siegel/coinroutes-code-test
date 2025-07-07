@@ -13,6 +13,21 @@ export function DraggableDashboard() {
   const swapyRef = useRef<unknown>(null);
   const chartRef = useRef<TradingViewChartRef>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  // Check if we're on desktop
+  useEffect(() => {
+    const checkIsDesktop = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
+
+    checkIsDesktop();
+    window.addEventListener('resize', checkIsDesktop);
+
+    return () => {
+      window.removeEventListener('resize', checkIsDesktop);
+    };
+  }, []);
 
   const initializeSwapy = useCallback(() => {
     if (!containerRef.current || swapyRef.current) return;
@@ -54,8 +69,10 @@ export function DraggableDashboard() {
   }, []);
 
   useEffect(() => {
-    // Prevent body scrolling
-    document.body.style.overflow = 'hidden';
+    // Only prevent body scrolling on desktop devices
+    if (isDesktop) {
+      document.body.style.overflow = 'hidden';
+    }
 
     // Small delay to ensure DOM is fully rendered
     const timer = setTimeout(() => {
@@ -64,22 +81,24 @@ export function DraggableDashboard() {
 
     return () => {
       clearTimeout(timer);
-      // Restore body scrolling
-      document.body.style.overflow = 'auto';
+      // Restore body scrolling only if it was modified
+      if (isDesktop) {
+        document.body.style.overflow = 'auto';
+      }
       if (swapyRef.current) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (swapyRef.current as any).destroy?.();
         swapyRef.current = null;
       }
     };
-  }, [initializeSwapy]);
+  }, [initializeSwapy, isDesktop]);
 
   return (
     <div
       ref={containerRef}
-      className="dashboard-container grid grid-cols-1 gap-4 overflow-hidden p-4 lg:grid-cols-2 lg:grid-rows-2"
+      className="dashboard-container grid grid-cols-1 grid-rows-[1.5fr_1fr_1fr] gap-4 p-4 lg:grid-cols-2 lg:grid-rows-2 lg:overflow-hidden"
       style={{
-        height: 'calc(100vh - 5rem)', // Account for navbar height (py-4 + border = ~5rem)
+        height: isDesktop ? 'calc(100vh - 5rem)' : 'auto', // Fixed height only on desktop
         willChange: 'transform',
         transform: 'translateZ(0)', // Force hardware acceleration
         backfaceVisibility: 'hidden' // Prevent flickering
@@ -91,7 +110,7 @@ export function DraggableDashboard() {
       >
         <div
           data-swapy-item="chart-item"
-          className="flex h-full flex-col"
+          className="flex h-full min-h-[300px] flex-col lg:min-h-0"
           style={{
             willChange: 'transform',
             transform: 'translateZ(0)',
@@ -127,7 +146,7 @@ export function DraggableDashboard() {
       >
         <div
           data-swapy-item="orderbook-item"
-          className="flex h-full flex-col"
+          className="flex h-full min-h-[300px] flex-col lg:min-h-0"
           style={{
             willChange: 'transform',
             transform: 'translateZ(0)',
@@ -163,7 +182,7 @@ export function DraggableDashboard() {
       >
         <div
           data-swapy-item="price-chart-item"
-          className="flex h-full flex-col"
+          className="flex h-full min-h-[300px] flex-col lg:min-h-0"
           style={{
             willChange: 'transform',
             transform: 'translateZ(0)',
