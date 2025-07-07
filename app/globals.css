@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Add anti-aliasing and transform optimizations */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent blurriness during drag operations */
+[data-swapy-item] {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Ensure crisp rendering during transforms */
+[data-swapy-item] * {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 3.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 3.9%;
+    --primary: 0 0% 9%;
+    --primary-foreground: 0 0% 98%;
+    --secondary: 0 0% 96.1%;
+    --secondary-foreground: 0 0% 9%;
+    --muted: 0 0% 96.1%;
+    --muted-foreground: 0 0% 45.1%;
+    --accent: 0 0% 96.1%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 89.8%;
+    --input: 0 0% 89.8%;
+    --ring: 0 0% 3.9%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 240 10% 3.9%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 240 5.9% 90%;
+    --sidebar-ring: 240 10% 3.9%;
+  }
+
+  .dark {
+    --background: 0 0% 3.9%;
+    --foreground: 0 0% 98%;
+    --card: 0 0% 3.9%;
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 14.9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    --sidebar-background: 240 10% 3.9%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 240 5.9% 10%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 240 4.9% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .min-h-screen {
+    min-height: 100vh;
+    /* Fallback */
+    min-height: 100dvh;
+  }
+
+  .h-screen {
+    height: 100vh;
+    /* Fallback */
+    height: 100dvh;
+  }
+}
+
+/* Chrome, Safari, Edge, Opera */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Firefox */
+input[type='number'] {
+  -moz-appearance: textfield;
+}
+
+/* Swapy styles - optimized for performance */
+[data-swapy-highlighted] {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+  background-color: hsl(var(--primary) / 0.1);
+  border-radius: 0.5rem;
+  transition:
+    outline 0.15s ease,
+    background-color 0.15s ease;
+}
+
+[data-swapy-item] {
+  cursor: grab;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+[data-swapy-item]:active {
+  cursor: grabbing;
+}
+
+/* Smooth dragging */
+[data-swapy-item].swapy-item-dragging {
+  z-index: 1000;
+  transform: scale(1.02);
+  box-shadow:
+    0 10px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Handle specific optimizations */
+[data-swapy-handle] {
+  touch-action: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Toolbar specific styles */
+[data-swapy-slot^='toolbar-'] {
+  transition: opacity 0.2s ease;
+}
+
+[data-swapy-slot^='toolbar-']:empty {
+  opacity: 0.5;
+}
+
+/* Main layout slots */
+[data-swapy-slot]:not([data-swapy-slot^='toolbar-']) {
+  transition: all 0.2s ease;
+  min-height: 200px;
+}
+
+[data-swapy-slot]:not([data-swapy-slot^='toolbar-']):empty {
+  background-color: hsl(var(--muted) / 0.3);
+  border: 2px dashed hsl(var(--muted));
+  border-radius: 0.5rem;
+}
+
+/* Dark mode specific styling for Swapy elements */
+.dark [data-swapy-highlighted] {
+  outline: 2px solid hsl(var(--primary));
+  outline-offset: -2px;
+  background-color: hsl(var(--primary) / 0.2);
+  border-radius: 0.5rem;
+}
+
+.dark [data-swapy-slot]:not([data-swapy-slot^='toolbar-']):empty {
+  background-color: hsl(0 0% 5%);
+  border: 2px dashed hsl(0 0% 20%);
+  border-radius: 0.5rem;
+}
