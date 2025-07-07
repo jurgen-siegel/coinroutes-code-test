@@ -203,20 +203,24 @@ export function OrderBookChart() {
     ]);
     const minPrice = Math.min(...allPrices);
     const maxPrice = Math.max(...allPrices);
-    const [currentMin, currentMax] = stableYRange;
 
-    const threshold = (currentMax - currentMin) * 0.1;
-    const needsUpdate =
-      minPrice < currentMin + threshold ||
-      maxPrice > currentMax - threshold ||
-      currentMax === 100;
+    setStableYRange((currentRange) => {
+      const [currentMin, currentMax] = currentRange;
+      const threshold = (currentMax - currentMin) * 0.1;
+      const needsUpdate =
+        minPrice < currentMin + threshold ||
+        maxPrice > currentMax - threshold ||
+        currentMax === 100;
 
-    if (needsUpdate) {
-      const range = maxPrice - minPrice;
-      const padding = Math.max(range * 0.01, 0.5);
-      setStableYRange([Math.max(0, minPrice - padding), maxPrice + padding]);
-    }
-  }, [priceHistory, stableYRange]);
+      if (needsUpdate) {
+        const range = maxPrice - minPrice;
+        const padding = Math.max(range * 0.01, 0.5);
+        return [Math.max(0, minPrice - padding), maxPrice + padding];
+      }
+
+      return currentRange;
+    });
+  }, [priceHistory]);
 
   // Reset on product change
   useEffect(() => {

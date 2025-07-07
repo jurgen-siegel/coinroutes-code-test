@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 import {
@@ -48,12 +48,8 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function DepthChart({ orderBook, isConnected }: DepthChartProps) {
-  const [stepData, setStepData] = useState<StepDataPoint[]>([]);
-
-  /**
-   * Transform order book data into step chart format
-   */
-  const transformToStepData = useCallback(() => {
+  // Transform order book data into step chart format
+  const stepData = useMemo((): StepDataPoint[] => {
     if (!orderBook.bids.length || !orderBook.asks.length || !isConnected) {
       return [];
     }
@@ -102,12 +98,6 @@ export function DepthChart({ orderBook, isConnected }: DepthChartProps) {
 
     return combinedData;
   }, [orderBook, isConnected]);
-
-  // Update step data when order book changes
-  useEffect(() => {
-    const newStepData = transformToStepData();
-    setStepData(newStepData);
-  }, [transformToStepData]);
 
   if (stepData.length === 0) {
     return (

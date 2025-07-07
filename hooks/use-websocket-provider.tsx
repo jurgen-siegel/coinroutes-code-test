@@ -231,7 +231,7 @@ export function useOrderBook(productId: string): UseOrderBookReturn {
       logger.debug('Unsubscribing from order book', { productId });
       unsubscribeFromProduct(productId);
     };
-  }, [productId, subscribeToProduct, unsubscribeFromProduct]);
+  }, [productId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get order book data or default empty state
   const orderBook = useMemo<OrderBookData>(() => {
