@@ -16,3 +16,8 @@ build
 .DS_Store
 .eslintignore
 pnpm-lock.yaml
+
+# Ignore TradingView charting library files
+**/charting_library/**
+components/dashboard/tradingview/charting_library/**
+public/charting_library/**

@@ -40,7 +40,11 @@ const config = tseslint.config(
       '**/node_modules/',
       '**/out/',
       '**/public/',
-      '**/*.d.ts'
+      '**/*.d.ts',
+      // Ignore TradingView charting library files
+      '**/charting_library/**',
+      'components/dashboard/tradingview/charting_library/**',
+      'public/charting_library/**'
     ]
   },
   // Flat configuration

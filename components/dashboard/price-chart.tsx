@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Line, LineChart, XAxis, YAxis } from 'recharts';
 
 import {
@@ -38,7 +38,6 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function OrderBookChart() {
-  const componentIdRef = useRef(`orderbook-chart-${Date.now()}`);
   const { selectedProduct } = useProductSelection();
   const { aggregateOrderBookData } = useAggregation();
   const [priceHistory, setPriceHistory] = useState<PriceDataPoint[]>([]);

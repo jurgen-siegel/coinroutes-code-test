@@ -2,7 +2,6 @@
 
 import {
   forwardRef,
-  useCallback,
   useEffect,
   useImperativeHandle,
   useMemo,
@@ -28,7 +27,7 @@ import { createCoinbaseDatafeed } from './tradingview/datafeed';
 declare global {
   interface Window {
     Datafeeds: {
-      UDFCompatibleDatafeed: new (url: string) => any;
+      UDFCompatibleDatafeed: new (url: string) => unknown;
     };
   }
 }
@@ -75,10 +74,9 @@ export const TradingViewChart = forwardRef<
   ) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartingLibraryWidget | null>(null);
-    const componentIdRef = useRef(`chart-${Date.now()}`);
     const webSocketProvider = useWebSocket();
     const { selectedProduct } = useProductSelection();
-    const { theme, resolvedTheme } = useTheme();
+    const { resolvedTheme } = useTheme();
     const [isChartReady, setIsChartReady] = useState(false);
     const datafeedRef = useRef<ReturnType<
       typeof createCoinbaseDatafeed
@@ -144,7 +142,7 @@ export const TradingViewChart = forwardRef<
             interval: interval,
             container: containerId,
             library_path: libraryPath,
-            locale: 'en' as any,
+            locale: 'en',
             disabled_features: [
               'use_localstorage_for_settings',
               'save_chart_properties_to_local_storage',
@@ -212,6 +210,7 @@ export const TradingViewChart = forwardRef<
         setIsChartReady(false);
         isInitializedRef.current = false;
       };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Empty dependency array - truly run only once
 
     // Effect to handle symbol changes from navbar
@@ -228,7 +227,7 @@ export const TradingViewChart = forwardRef<
       chartRef.current.setSymbol(selectedProduct, interval, () => {
         currentSymbolRef.current = selectedProduct;
       });
-    }, [selectedProduct, isChartReady]);
+    }, [selectedProduct, isChartReady, interval]);
 
     // Effect to handle theme changes
     useEffect(() => {

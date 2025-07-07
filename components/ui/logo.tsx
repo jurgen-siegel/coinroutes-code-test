@@ -26,7 +26,7 @@ export function Logo({
     >
       {!hideSymbol && (
         <div className="flex size-9 items-center justify-center p-1">
-          <div className="flex size-7 items-center justify-center rounded-md border overflow-hidden">
+          <div className="flex size-7 items-center justify-center overflow-hidden rounded-md border">
             <Image
               src="/favicon-32x32.png"
               alt={`${AppInfo.APP_NAME} Logo`}

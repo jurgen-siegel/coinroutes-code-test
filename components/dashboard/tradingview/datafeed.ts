@@ -480,7 +480,7 @@ export class CoinbaseDatafeed implements IExternalDatafeed {
     resolution: ResolutionString,
     callback: SubscribeBarsCallback,
     subscriberUID: string,
-    resetCacheNeededCallback?: () => void
+    _resetCacheNeededCallback?: () => void
   ): void {
     const symbol = symbolInfo.ticker!;
 

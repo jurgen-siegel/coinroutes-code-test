@@ -10,7 +10,7 @@ import { OrderBookChart } from './price-chart';
 
 export function DraggableDashboard() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const swapyRef = useRef<any>(null);
+  const swapyRef = useRef<unknown>(null);
   const chartRef = useRef<TradingViewChartRef>(null);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -22,23 +22,25 @@ export function DraggableDashboard() {
     });
 
     // Handle drag start
-    swapyRef.current.onSwapStart?.((event: any) => {
-      console.log('🎯 Drag started - disabling chart interactions');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (swapyRef.current as any).onSwapStart?.(() => {
       setIsDragging(true);
     });
 
-    swapyRef.current.onSwap((event: any) => {
-      console.log('Widgets swapped:', event.newSlotItemMap.asObject);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (swapyRef.current as any).onSwap((_event: unknown) => {
+      // Widget swap handled
     });
 
     // Fix for lag issues - update swapy after swap completes
-    swapyRef.current.onSwapEnd((event: any) => {
-      console.log('🎯 Drag ended - enabling chart interactions');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (swapyRef.current as any).onSwapEnd((_event: unknown) => {
       setIsDragging(false);
 
       // Refresh chart theme and resize after drag operation
       requestAnimationFrame(() => {
-        swapyRef.current?.update();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (swapyRef.current as any)?.update();
 
         // Fix chart theme and sizing after DOM manipulation
         setTimeout(() => {
@@ -65,7 +67,8 @@ export function DraggableDashboard() {
       // Restore body scrolling
       document.body.style.overflow = 'auto';
       if (swapyRef.current) {
-        swapyRef.current.destroy?.();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (swapyRef.current as any).destroy?.();
         swapyRef.current = null;
       }
     };

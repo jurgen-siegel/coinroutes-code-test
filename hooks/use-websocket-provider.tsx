@@ -11,6 +11,8 @@ import {
   useState
 } from 'react';
 
+import { DEFAULT_LOCALE } from '@/lib/i18n/locale';
+
 interface OrderBookEntry {
   price: string;
   size: string;
@@ -52,7 +54,6 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
   const reconnectAttempts = useRef(0);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const maxReconnectAttempts = 5;
-  const providerId = useRef(`ws-provider-${Date.now()}`);
   const priceUpdateCallbacks = useRef<
     Set<(symbol: string, price: number) => void>
   >(new Set());
@@ -107,17 +108,28 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           const data = JSON.parse(event.data);
 
           if (data.channel === 'l2_data' && data.events) {
-            data.events.forEach((event: any) => {
-              const productId = event.product_id;
+            data.events.forEach((event: unknown) => {
+              const eventData = event as {
+                product_id?: string;
+                type?: string;
+                updates?: Array<{
+                  side: string;
+                  price_level: string;
+                  new_quantity: string;
+                  exchange?: string;
+                }>;
+              };
+
+              const productId = eventData.product_id;
 
               if (!productId || !subscribedProducts.current.has(productId)) {
                 return;
               }
 
-              if (event.type === 'snapshot') {
-                const bids = event.updates
-                  .filter((update: any) => update.side === 'bid')
-                  .map((update: any) => ({
+              if (eventData.type === 'snapshot') {
+                const bids = (eventData.updates || [])
+                  .filter((update) => update.side === 'bid')
+                  .map((update) => ({
                     price: update.price_level,
                     size: update.new_quantity,
                     exchange: update.exchange || 'Coinbase'
@@ -128,9 +140,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
                   )
                   .slice(0, 10);
 
-                const asks = event.updates
-                  .filter((update: any) => update.side === 'offer')
-                  .map((update: any) => ({
+                const asks = (eventData.updates || [])
+                  .filter((update) => update.side === 'offer')
+                  .map((update) => ({
                     price: update.price_level,
                     size: update.new_quantity,
                     exchange: update.exchange || 'Coinbase'
@@ -159,7 +171,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
                     callback(productId, midPrice);
                   });
                 }
-              } else if (event.type === 'update') {
+              } else if (eventData.type === 'update') {
                 setState((prev) => {
                   const currentOrderBook = prev.orderBooks[productId];
                   if (!currentOrderBook) {
@@ -169,7 +181,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
                   const newBids = [...currentOrderBook.bids];
                   const newAsks = [...currentOrderBook.asks];
 
-                  event.updates.forEach((update: any) => {
+                  (eventData.updates || []).forEach((update) => {
                     const entry = {
                       price: update.price_level,
                       size: update.new_quantity,
@@ -248,11 +260,12 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
             });
           }
         } catch (error) {
-          // Error parsing WebSocket message
+          console.error('Error parsing WebSocket message:', error);
         }
       };
 
       ws.onerror = (error) => {
+        console.error('WebSocket error:', error);
         setState((prev) => ({ ...prev, error: 'WebSocket connection error' }));
       };
 
@@ -288,7 +301,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       setState((prev) => ({
         ...prev,
-        error: `Failed to create connection: ${error.message}`,
+        error: `Failed to create connection: ${(error as Error).message}`,
         isConnecting: false
       }));
     }
@@ -423,7 +436,7 @@ export function useOrderBook(productId: string) {
       const quoteCurrency = getQuoteCurrency(productId);
 
       if (quoteCurrency === 'USD') {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat(DEFAULT_LOCALE, {
           style: 'currency',
           currency: 'USD',
           minimumFractionDigits: 2,
@@ -438,7 +451,7 @@ export function useOrderBook(productId: string) {
 
   const formatSize = useCallback((size: string) => {
     const num = parseFloat(size);
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat(DEFAULT_LOCALE, {
       minimumFractionDigits: 4,
       maximumFractionDigits: 8
     }).format(num);
@@ -450,7 +463,7 @@ export function useOrderBook(productId: string) {
       const quoteCurrency = getQuoteCurrency(productId);
 
       if (quoteCurrency === 'USD') {
-        return new Intl.NumberFormat('en-US', {
+        return new Intl.NumberFormat(DEFAULT_LOCALE, {
           style: 'currency',
           currency: 'USD',
           minimumFractionDigits: 2,
