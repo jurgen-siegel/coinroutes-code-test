@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Line, LineChart, XAxis, YAxis } from 'recharts';
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 import {
   ChartContainer,
@@ -25,11 +25,11 @@ interface PriceDataPoint {
 const chartConfig = {
   bestBid: {
     label: 'Best Bid',
-    color: 'hsl(142, 76%, 36%)' // Green color
+    color: 'hsl(142, 76%, 36%)'
   },
   bestAsk: {
     label: 'Best Ask',
-    color: 'hsl(0, 84%, 60%)' // Red color
+    color: 'hsl(0, 84%, 60%)'
   },
   spread: {
     label: 'Spread',
@@ -37,64 +37,191 @@ const chartConfig = {
   }
 } satisfies ChartConfig;
 
+const CARD_CONFIGS = {
+  bid: {
+    label: 'Best Bid',
+    color: 'green',
+    borderColor: 'border-green-200 dark:border-green-800/30',
+    bgColor:
+      'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20',
+    textColor: 'text-green-700 dark:text-green-300',
+    valueColor: 'text-green-600 dark:text-green-400',
+    mutedColor: 'text-green-600/70 dark:text-green-400/70',
+    dotColor: 'bg-green-500',
+    animate: true
+  },
+  spread: {
+    label: 'Spread',
+    color: 'blue',
+    borderColor: 'border-blue-200 dark:border-blue-800/30',
+    bgColor:
+      'bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20',
+    textColor: 'text-blue-700 dark:text-blue-300',
+    valueColor: 'text-blue-600 dark:text-blue-400',
+    mutedColor: 'text-blue-600/70 dark:text-blue-400/70',
+    dotColor: 'bg-blue-500',
+    animate: false
+  },
+  ask: {
+    label: 'Best Ask',
+    color: 'red',
+    borderColor: 'border-red-200 dark:border-red-800/30',
+    bgColor:
+      'bg-gradient-to-br from-red-50 to-rose-50 dark:from-red-950/20 dark:to-rose-950/20',
+    textColor: 'text-red-700 dark:text-red-300',
+    valueColor: 'text-red-600 dark:text-red-400',
+    mutedColor: 'text-red-600/70 dark:text-red-400/70',
+    dotColor: 'bg-red-500',
+    animate: true
+  }
+} as const;
+
+const MAX_DATA_POINTS = 200;
+const INITIAL_Y_RANGE: [number, number] = [0, 100];
+
+// Helper functions
+const formatPrice = (price: number) =>
+  price.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+
+const formatVolume = (size: number, price: number) => {
+  const volume = size * price;
+  return `Vol: ${size} ($${formatPrice(volume)})`;
+};
+
+const formatPercentage = (value: number) => `${value.toFixed(3)}%`;
+
+interface PriceCardProps {
+  type: keyof typeof CARD_CONFIGS;
+  value: string;
+  subtitle?: string;
+}
+
+function PriceCard({ type, value, subtitle }: PriceCardProps) {
+  const config = CARD_CONFIGS[type];
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-lg border p-2 sm:p-3 ${config.borderColor} ${config.bgColor}`}
+    >
+      <div className="mb-1 flex items-center gap-1 sm:mb-2 sm:gap-1.5">
+        <div
+          className={`size-1 rounded-full sm:size-1.5 ${config.dotColor} ${config.animate ? 'animate-pulse' : ''}`}
+        />
+        <span
+          className={`text-[10px] font-medium sm:text-xs ${config.textColor}`}
+        >
+          {config.label}
+        </span>
+      </div>
+      <div className="space-y-0.5">
+        <div
+          className={`text-sm font-bold tabular-nums sm:text-lg ${config.valueColor}`}
+        >
+          ${value}
+        </div>
+        {subtitle && (
+          <div
+            className={`hidden text-[10px] font-medium sm:block ${config.mutedColor}`}
+          >
+            {subtitle}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function OrderBookChart() {
   const { selectedProduct } = useProductSelection();
   const { aggregateOrderBookData } = useAggregation();
   const [priceHistory, setPriceHistory] = useState<PriceDataPoint[]>([]);
-  const maxDataPoints = 200; // Keep last 200 data points
+  const [stableYRange, setStableYRange] =
+    useState<[number, number]>(INITIAL_Y_RANGE);
 
   const { orderBook, isConnected, isConnecting, error } =
     useOrderBook(selectedProduct);
 
-  /**
-   * Aggregate order book data for summary cards (to match order book view)
-   */
-  const aggregatedOrderBook = useMemo(() => {
-    return {
+  const aggregatedOrderBook = useMemo(
+    () => ({
       bids: aggregateOrderBookData(orderBook.bids, true),
       asks: aggregateOrderBookData(orderBook.asks, false),
       lastUpdated: orderBook.lastUpdated
-    };
-  }, [orderBook, aggregateOrderBookData]);
+    }),
+    [orderBook, aggregateOrderBookData]
+  );
 
-  // Format timestamp for display
-  const formatTime = useCallback((timestamp: number) => {
-    return new Date(timestamp).toLocaleTimeString('en-US', {
-      hour12: false,
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  }, []);
+  const formatTime = useCallback(
+    (timestamp: number) =>
+      new Date(timestamp).toLocaleTimeString('en-US', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      }),
+    []
+  );
 
-  // Update price history when orderbook changes (using raw data for accurate price tracking)
+  // Price calculations
+  const bestBidPrice = parseFloat(aggregatedOrderBook.bids[0]?.price || '0');
+  const bestAskPrice = parseFloat(aggregatedOrderBook.asks[0]?.price || '0');
+  const bestBidSize = parseFloat(aggregatedOrderBook.bids[0]?.size || '0');
+  const bestAskSize = parseFloat(aggregatedOrderBook.asks[0]?.size || '0');
+  const spread = bestAskPrice - bestBidPrice;
+  const spreadPercentage = (spread / bestBidPrice) * 100;
+
+  // Update price history
   useEffect(() => {
-    if (!orderBook.bids.length || !orderBook.asks.length || !isConnected) {
+    if (!orderBook.bids.length || !orderBook.asks.length || !isConnected)
       return;
-    }
 
-    const bestBid = parseFloat(orderBook.bids[0]?.price || '0');
-    const bestAsk = parseFloat(orderBook.asks[0]?.price || '0');
-    const spread = bestAsk - bestBid;
+    const rawBestBid = parseFloat(orderBook.bids[0]?.price || '0');
+    const rawBestAsk = parseFloat(orderBook.asks[0]?.price || '0');
     const timestamp = Date.now();
 
     const newDataPoint: PriceDataPoint = {
       timestamp,
       time: formatTime(timestamp),
-      bestBid,
-      bestAsk,
-      spread
+      bestBid: rawBestBid,
+      bestAsk: rawBestAsk,
+      spread: rawBestAsk - rawBestBid
     };
 
-    setPriceHistory((prev) => {
-      const newHistory = [...prev, newDataPoint];
-      // Keep only the last maxDataPoints
-      return newHistory.slice(-maxDataPoints);
-    });
+    setPriceHistory((prev) => [...prev, newDataPoint].slice(-MAX_DATA_POINTS));
   }, [orderBook, isConnected, formatTime]);
 
-  // Clear history when product changes
+  // Update Y-axis range
+  useEffect(() => {
+    if (priceHistory.length < 10) return;
+
+    const recentPrices = priceHistory.slice(-50);
+    const allPrices = recentPrices.flatMap((point) => [
+      point.bestBid,
+      point.bestAsk
+    ]);
+    const minPrice = Math.min(...allPrices);
+    const maxPrice = Math.max(...allPrices);
+    const [currentMin, currentMax] = stableYRange;
+
+    const threshold = (currentMax - currentMin) * 0.1;
+    const needsUpdate =
+      minPrice < currentMin + threshold ||
+      maxPrice > currentMax - threshold ||
+      currentMax === 100;
+
+    if (needsUpdate) {
+      const range = maxPrice - minPrice;
+      const padding = Math.max(range * 0.01, 0.5);
+      setStableYRange([Math.max(0, minPrice - padding), maxPrice + padding]);
+    }
+  }, [priceHistory, stableYRange]);
+
+  // Reset on product change
   useEffect(() => {
     setPriceHistory([]);
+    setStableYRange(INITIAL_Y_RANGE);
   }, [selectedProduct]);
 
   if (isConnecting || !isConnected) {
@@ -139,103 +266,24 @@ export function OrderBookChart() {
 
   return (
     <div className="flex size-full flex-col p-3 sm:p-6">
-      {/* Price Summary - using aggregated data to match order book view */}
+      {/* Price Summary Cards */}
       <div className="mb-2 sm:mb-4">
         <div className="grid grid-cols-3 gap-1.5 sm:gap-3">
-          {/* Best Bid Card */}
-          <div className="relative overflow-hidden rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-2 dark:border-green-800/30 dark:from-green-950/20 dark:to-emerald-950/20 sm:p-3">
-            <div className="mb-1 flex items-center gap-1 sm:mb-2 sm:gap-1.5">
-              <div className="size-1 animate-pulse rounded-full bg-green-500 sm:size-1.5" />
-              <span className="text-[10px] font-medium text-green-700 dark:text-green-300 sm:text-xs">
-                Best Bid
-              </span>
-            </div>
-            <div className="space-y-0.5">
-              <div className="text-sm font-bold tabular-nums text-green-600 dark:text-green-400 sm:text-lg">
-                $
-                {parseFloat(
-                  aggregatedOrderBook.bids[0]?.price || '0'
-                ).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-              </div>
-              <div className="hidden text-[10px] font-medium text-green-600/70 dark:text-green-400/70 sm:block">
-                Vol: {parseFloat(aggregatedOrderBook.bids[0]?.size || '0')} ($
-                {(
-                  parseFloat(aggregatedOrderBook.bids[0]?.size || '0') *
-                  parseFloat(aggregatedOrderBook.bids[0]?.price || '0')
-                ).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-                )
-              </div>
-            </div>
-          </div>
-
-          {/* Spread Card */}
-          <div className="relative overflow-hidden rounded-lg border border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50 p-2 dark:border-blue-800/30 dark:from-blue-950/20 dark:to-indigo-950/20 sm:p-3">
-            <div className="mb-1 flex items-center gap-1 sm:mb-2 sm:gap-1.5">
-              <div className="size-1 rounded-full bg-blue-500 sm:size-1.5" />
-              <span className="text-[10px] font-medium text-blue-700 dark:text-blue-300 sm:text-xs">
-                Spread
-              </span>
-            </div>
-            <div className="space-y-0.5">
-              <div className="text-sm font-bold tabular-nums text-blue-600 dark:text-blue-400 sm:text-lg">
-                $
-                {(
-                  parseFloat(aggregatedOrderBook.asks[0]?.price || '0') -
-                  parseFloat(aggregatedOrderBook.bids[0]?.price || '0')
-                ).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-              </div>
-              <div className="hidden text-[10px] font-medium text-blue-600/70 dark:text-blue-400/70 sm:block">
-                {(
-                  ((parseFloat(aggregatedOrderBook.asks[0]?.price || '0') -
-                    parseFloat(aggregatedOrderBook.bids[0]?.price || '0')) /
-                    parseFloat(aggregatedOrderBook.bids[0]?.price || '1')) *
-                  100
-                ).toFixed(3)}
-                %
-              </div>
-            </div>
-          </div>
-
-          {/* Best Ask Card */}
-          <div className="relative overflow-hidden rounded-lg border border-red-200 bg-gradient-to-br from-red-50 to-rose-50 p-2 dark:border-red-800/30 dark:from-red-950/20 dark:to-rose-950/20 sm:p-3">
-            <div className="mb-1 flex items-center gap-1 sm:mb-2 sm:gap-1.5">
-              <div className="size-1 animate-pulse rounded-full bg-red-500 sm:size-1.5" />
-              <span className="text-[10px] font-medium text-red-700 dark:text-red-300 sm:text-xs">
-                Best Ask
-              </span>
-            </div>
-            <div className="space-y-0.5">
-              <div className="text-sm font-bold tabular-nums text-red-600 dark:text-red-400 sm:text-lg">
-                $
-                {parseFloat(
-                  aggregatedOrderBook.asks[0]?.price || '0'
-                ).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-              </div>
-              <div className="hidden text-[10px] font-medium text-red-600/70 dark:text-red-400/70 sm:block">
-                Vol: {parseFloat(aggregatedOrderBook.asks[0]?.size || '0')} ($
-                {(
-                  parseFloat(aggregatedOrderBook.asks[0]?.size || '0') *
-                  parseFloat(aggregatedOrderBook.asks[0]?.price || '0')
-                ).toLocaleString('en-US', {
-                  minimumFractionDigits: 2,
-                  maximumFractionDigits: 2
-                })}
-                )
-              </div>
-            </div>
-          </div>
+          <PriceCard
+            type="bid"
+            value={formatPrice(bestBidPrice)}
+            subtitle={formatVolume(bestBidSize, bestBidPrice)}
+          />
+          <PriceCard
+            type="spread"
+            value={formatPrice(spread)}
+            subtitle={formatPercentage(spreadPercentage)}
+          />
+          <PriceCard
+            type="ask"
+            value={formatPrice(bestAskPrice)}
+            subtitle={formatVolume(bestAskSize, bestAskPrice)}
+          />
         </div>
       </div>
 
@@ -245,15 +293,14 @@ export function OrderBookChart() {
           config={chartConfig}
           className="size-full"
         >
-          <LineChart
+          <AreaChart
             data={priceHistory}
-            margin={{
-              top: 10,
-              right: 10,
-              left: 10,
-              bottom: 10
-            }}
+            margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
           >
+            <CartesianGrid
+              vertical={false}
+              strokeDasharray="3 3"
+            />
             <XAxis
               dataKey="time"
               tickLine={false}
@@ -262,7 +309,7 @@ export function OrderBookChart() {
               interval="preserveStartEnd"
             />
             <YAxis
-              domain={['dataMin - 0.1', 'dataMax + 0.1']}
+              domain={stableYRange}
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 10 }}
@@ -274,7 +321,7 @@ export function OrderBookChart() {
                   labelFormatter={(value) => `Time: ${value}`}
                   formatter={(value, name) => {
                     const price = `$${Number(value).toFixed(2)}`;
-                    const color = name === 'Best Bid' ? '#16a34a' : '#dc2626'; // green for bid, red for ask
+                    const color = name === 'Best Bid' ? '#16a34a' : '#dc2626';
                     return [
                       <span
                         key={name}
@@ -293,23 +340,25 @@ export function OrderBookChart() {
                 />
               }
             />
-            <Line
-              type="monotone"
+            <Area
               dataKey="bestBid"
+              type="step"
+              fill="transparent"
               stroke="var(--color-bestBid)"
               strokeWidth={2}
-              dot={false}
               name="Best Bid"
+              isAnimationActive={false}
             />
-            <Line
-              type="monotone"
+            <Area
               dataKey="bestAsk"
+              type="step"
+              fill="transparent"
               stroke="var(--color-bestAsk)"
               strokeWidth={2}
-              dot={false}
               name="Best Ask"
+              isAnimationActive={false}
             />
-          </LineChart>
+          </AreaChart>
         </ChartContainer>
       </div>
 
