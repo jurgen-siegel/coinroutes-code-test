@@ -19,31 +19,46 @@ export function DashboardMobileMenu({
   ...other
 }: React.HTMLAttributes<HTMLDivElement>): React.JSX.Element {
   const [open, setOpen] = React.useState<boolean>(false);
+  const [windowWidth, setWindowWidth] = React.useState<number>(0);
 
-  const handleChange = () => {
-    const mediaQueryList = window.matchMedia('(min-width: 768px)');
-    setOpen((open) => (open ? !mediaQueryList.matches : false));
-  };
+  // Computed values
+  const isDesktop = windowWidth >= 768;
+  const shouldCloseMenu = open && isDesktop;
+  const needsBodyScrollLock = open;
 
+  // useEffect to handle all mobile menu logic
   React.useEffect(() => {
-    handleChange();
-    const mediaQueryList = window.matchMedia('(min-width: 768px)');
-    mediaQueryList.addEventListener('change', handleChange);
-    return () => mediaQueryList.removeEventListener('change', handleChange);
-  }, []);
+    const updateWindowWidth = () => {
+      setWindowWidth(window.innerWidth);
+    };
 
-  // Manage body scroll when menu is open
-  React.useEffect(() => {
-    if (open) {
+    // Initialize window width
+    if (windowWidth === 0) {
+      updateWindowWidth();
+    }
+
+    // Set up media query listener
+    const mediaQueryList = window.matchMedia('(min-width: 768px)');
+    mediaQueryList.addEventListener('change', updateWindowWidth);
+
+    // Close menu if switching to desktop
+    if (shouldCloseMenu) {
+      setOpen(false);
+    }
+
+    // Manage body scroll
+    if (needsBodyScrollLock) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
 
+    // Cleanup
     return () => {
+      mediaQueryList.removeEventListener('change', updateWindowWidth);
       document.body.style.overflow = '';
     };
-  }, [open]);
+  }, [windowWidth, shouldCloseMenu, needsBodyScrollLock]);
 
   const handleToggleMobileMenu = (): void => {
     setOpen((open) => !open);

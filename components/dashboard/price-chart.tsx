@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 
 import {
@@ -93,6 +93,14 @@ const formatVolume = (size: number, price: number) => {
 
 const formatPercentage = (value: number) => `${value.toFixed(3)}%`;
 
+const formatTime = (timestamp: number) =>
+  new Date(timestamp).toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit'
+  });
+
 interface PriceCardProps {
   type: keyof typeof CARD_CONFIGS;
   value: string;
@@ -137,13 +145,14 @@ function PriceCard({ type, value, subtitle }: PriceCardProps) {
 export function OrderBookChart() {
   const { selectedProduct } = useProductSelection();
   const { aggregateOrderBookData } = useAggregation();
+
   const [priceHistory, setPriceHistory] = useState<PriceDataPoint[]>([]);
-  const [stableYRange, setStableYRange] =
-    useState<[number, number]>(INITIAL_Y_RANGE);
+  const [currentProduct, setCurrentProduct] = useState(selectedProduct);
 
   const { orderBook, isConnected, isConnecting, error } =
     useOrderBook(selectedProduct);
 
+  // Computed values
   const aggregatedOrderBook = useMemo(
     () => ({
       bids: aggregateOrderBookData(orderBook.bids, true),
@@ -153,18 +162,6 @@ export function OrderBookChart() {
     [orderBook, aggregateOrderBookData]
   );
 
-  const formatTime = useCallback(
-    (timestamp: number) =>
-      new Date(timestamp).toLocaleTimeString('en-US', {
-        hour12: false,
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      }),
-    []
-  );
-
-  // Price calculations
   const bestBidPrice = parseFloat(aggregatedOrderBook.bids[0]?.price || '0');
   const bestAskPrice = parseFloat(aggregatedOrderBook.asks[0]?.price || '0');
   const bestBidSize = parseFloat(aggregatedOrderBook.bids[0]?.size || '0');
@@ -172,61 +169,72 @@ export function OrderBookChart() {
   const spread = bestAskPrice - bestBidPrice;
   const spreadPercentage = (spread / bestBidPrice) * 100;
 
-  // Update price history
-  useEffect(() => {
-    if (!orderBook.bids.length || !orderBook.asks.length || !isConnected)
-      return;
-
-    const rawBestBid = parseFloat(orderBook.bids[0]?.price || '0');
-    const rawBestAsk = parseFloat(orderBook.asks[0]?.price || '0');
-    const timestamp = Date.now();
-
-    const newDataPoint: PriceDataPoint = {
-      timestamp,
-      time: formatTime(timestamp),
-      bestBid: rawBestBid,
-      bestAsk: rawBestAsk,
-      spread: rawBestAsk - rawBestBid
-    };
-
-    setPriceHistory((prev) => [...prev, newDataPoint].slice(-MAX_DATA_POINTS));
-  }, [orderBook, isConnected, formatTime]);
-
-  // Update Y-axis range
-  useEffect(() => {
-    if (priceHistory.length < 10) return;
+  // Calculate Y-axis range based on price history
+  const stableYRange = useMemo((): [number, number] => {
+    if (priceHistory.length < 10) {
+      return INITIAL_Y_RANGE;
+    }
 
     const recentPrices = priceHistory.slice(-50);
     const allPrices = recentPrices.flatMap((point) => [
       point.bestBid,
       point.bestAsk
     ]);
+
+    if (allPrices.length === 0) {
+      return INITIAL_Y_RANGE;
+    }
+
     const minPrice = Math.min(...allPrices);
     const maxPrice = Math.max(...allPrices);
+    const range = maxPrice - minPrice;
+    const padding = Math.max(range * 0.01, 0.5);
 
-    setStableYRange((currentRange) => {
-      const [currentMin, currentMax] = currentRange;
-      const threshold = (currentMax - currentMin) * 0.1;
-      const needsUpdate =
-        minPrice < currentMin + threshold ||
-        maxPrice > currentMax - threshold ||
-        currentMax === 100;
-
-      if (needsUpdate) {
-        const range = maxPrice - minPrice;
-        const padding = Math.max(range * 0.01, 0.5);
-        return [Math.max(0, minPrice - padding), maxPrice + padding];
-      }
-
-      return currentRange;
-    });
+    return [Math.max(0, minPrice - padding), maxPrice + padding];
   }, [priceHistory]);
 
-  // Reset on product change
+  // Reset price history when product changes and update price history when order book updates
   useEffect(() => {
-    setPriceHistory([]);
-    setStableYRange(INITIAL_Y_RANGE);
-  }, [selectedProduct]);
+    // Reset when product changes
+    if (currentProduct !== selectedProduct) {
+      setPriceHistory([]);
+      setCurrentProduct(selectedProduct);
+      return;
+    }
+
+    // Update price history when order book updates
+    if (
+      orderBook.bids.length > 0 &&
+      orderBook.asks.length > 0 &&
+      isConnected &&
+      orderBook.lastUpdated &&
+      currentProduct === selectedProduct
+    ) {
+      const rawBestBid = parseFloat(orderBook.bids[0]?.price || '0');
+      const rawBestAsk = parseFloat(orderBook.asks[0]?.price || '0');
+      const timestamp = Date.now();
+
+      const newDataPoint: PriceDataPoint = {
+        timestamp,
+        time: formatTime(timestamp),
+        bestBid: rawBestBid,
+        bestAsk: rawBestAsk,
+        spread: rawBestAsk - rawBestBid
+      };
+
+      setPriceHistory((prev) => {
+        const updated = [...prev, newDataPoint].slice(-MAX_DATA_POINTS);
+        return updated;
+      });
+    }
+  }, [
+    orderBook.bids,
+    orderBook.asks,
+    orderBook.lastUpdated,
+    isConnected,
+    currentProduct,
+    selectedProduct
+  ]);
 
   if (isConnecting || !isConnected) {
     return (

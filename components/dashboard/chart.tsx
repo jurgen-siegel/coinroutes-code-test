@@ -194,38 +194,27 @@ export const TradingViewChart = forwardRef<
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []); // Empty dependency array - truly run only once
 
-    // Effect to handle symbol changes from navbar
+    // Combined effect to handle both symbol and theme changes
     useEffect(() => {
-      if (
-        !isChartReady ||
-        !chartRef.current ||
-        currentSymbolRef.current === selectedProduct
-      ) {
+      if (!isChartReady || !chartRef.current) {
         return;
       }
 
-      // Use TradingView's setSymbol method to change symbol without re-initializing
-      chartRef.current.setSymbol(selectedProduct, interval, () => {
-        currentSymbolRef.current = selectedProduct;
-      });
-    }, [selectedProduct, isChartReady, interval]);
-
-    // Effect to handle theme changes
-    useEffect(() => {
-      if (
-        !isChartReady ||
-        !chartRef.current ||
-        currentThemeRef.current === chartTheme
-      ) {
-        return;
+      // Handle symbol changes
+      if (currentSymbolRef.current !== selectedProduct) {
+        chartRef.current.setSymbol(selectedProduct, interval, () => {
+          currentSymbolRef.current = selectedProduct;
+        });
       }
 
-      // Use TradingView's changeTheme method to update the theme
-      if (typeof chartRef.current.changeTheme === 'function') {
-        chartRef.current.changeTheme(chartTheme as ThemeName);
-        currentThemeRef.current = chartTheme;
+      // Handle theme changes
+      if (currentThemeRef.current !== chartTheme) {
+        if (typeof chartRef.current.changeTheme === 'function') {
+          chartRef.current.changeTheme(chartTheme as ThemeName);
+          currentThemeRef.current = chartTheme;
+        }
       }
-    }, [chartTheme, isChartReady]);
+    }, [selectedProduct, chartTheme, isChartReady, interval]);
 
     return (
       <div

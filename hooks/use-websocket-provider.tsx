@@ -99,62 +99,57 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Helper function to execute operations when client is ready
-  const executeWhenReady = useCallback((operation: () => void) => {
-    if (isInitializedRef.current && clientRef.current) {
-      operation();
-    } else {
-      pendingOperationsRef.current.push(operation);
-    }
-  }, []);
-
   // Subscribe to product updates
-  const subscribeToProduct = useCallback(
-    (productId: string) => {
-      executeWhenReady(() => {
+  const subscribeToProduct = useCallback((productId: string) => {
+    if (isInitializedRef.current && clientRef.current) {
+      clientRef.current.subscribeToProduct(productId);
+    } else {
+      pendingOperationsRef.current.push(() => {
         if (clientRef.current) {
           clientRef.current.subscribeToProduct(productId);
         }
       });
-    },
-    [executeWhenReady]
-  );
+    }
+  }, []);
 
   // Unsubscribe from product updates
-  const unsubscribeFromProduct = useCallback(
-    (productId: string) => {
-      executeWhenReady(() => {
+  const unsubscribeFromProduct = useCallback((productId: string) => {
+    if (isInitializedRef.current && clientRef.current) {
+      clientRef.current.unsubscribeFromProduct(productId);
+    } else {
+      pendingOperationsRef.current.push(() => {
         if (clientRef.current) {
           clientRef.current.unsubscribeFromProduct(productId);
         }
       });
-    },
-    [executeWhenReady]
-  );
+    }
+  }, []);
 
   // Register price update callback
-  const onPriceUpdate = useCallback(
-    (callback: PriceUpdateCallback) => {
-      executeWhenReady(() => {
+  const onPriceUpdate = useCallback((callback: PriceUpdateCallback) => {
+    if (isInitializedRef.current && clientRef.current) {
+      clientRef.current.addPriceUpdateCallback(callback);
+    } else {
+      pendingOperationsRef.current.push(() => {
         if (clientRef.current) {
           clientRef.current.addPriceUpdateCallback(callback);
         }
       });
-    },
-    [executeWhenReady]
-  );
+    }
+  }, []);
 
   // Remove price update callback
-  const offPriceUpdate = useCallback(
-    (callback: PriceUpdateCallback) => {
-      executeWhenReady(() => {
+  const offPriceUpdate = useCallback((callback: PriceUpdateCallback) => {
+    if (isInitializedRef.current && clientRef.current) {
+      clientRef.current.removePriceUpdateCallback(callback);
+    } else {
+      pendingOperationsRef.current.push(() => {
         if (clientRef.current) {
           clientRef.current.removePriceUpdateCallback(callback);
         }
       });
-    },
-    [executeWhenReady]
-  );
+    }
+  }, []);
 
   // Memoize context value to prevent unnecessary re-renders
   const contextValue = useMemo<WebSocketContextType>(
