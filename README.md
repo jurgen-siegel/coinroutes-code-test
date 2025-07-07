@@ -1,11 +1,11 @@
 # Coinroute Code Test
 
-A cryptocurrency trading dashboard built for the Coinroute code test, featuring real-time market data visualization and trading tools.
+A cryptocurrency trading dashboard built for the Coinroutes code test, with real-time market data visualization and trading tools.
 
 ## Features
 
 - **Order Book**: Real-time order book display with bid/ask prices and volumes
-- **Price Chart**: Interactive price charts showing cryptocurrency market movements
+- **Price Chart**: Interactive price charts (line chart) showing cryptocurrency market movements
 - **TradingView Chart**: Professional-grade TradingView charting integration with advanced technical analysis tools
 
 ## Tech Stack
@@ -40,5 +40,3 @@ A cryptocurrency trading dashboard built for the Coinroute code test, featuring 
 4. **Open your browser**
 
    Navigate to [http://localhost:3000](http://localhost:3000) to view the application.
-
-That's it! The dashboard should now be running with live cryptocurrency data.
