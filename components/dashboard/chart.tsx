@@ -13,7 +13,6 @@ import { useTheme } from 'next-themes';
 import { useProductSelection } from '../../hooks/use-crypto-pair-selection';
 import { useWebSocket } from '../../hooks/use-websocket-provider';
 import {
-  AvailableSaveloadVersions,
   ChartingLibraryFeatureset,
   ChartingLibraryWidgetOptions,
   IChartingLibraryWidget,
@@ -37,21 +36,14 @@ interface ChartContainerProps {
   interval?: ResolutionString;
   containerId?: string;
   libraryPath?: string;
-  chartsStorageUrl?: string;
-  chartsStorageApiVersion?: AvailableSaveloadVersions;
-  clientId?: string;
-  userId?: string;
   fullscreen?: boolean;
   autosize?: boolean;
-  studiesOverrides?: Record<string, string>;
 }
 
 export interface TradingViewChartRef {
   refreshTheme: () => void;
   resize: () => void;
 }
-
-const defaultStudiesOverrides = {};
 
 export const TradingViewChart = forwardRef<
   TradingViewChartRef,
@@ -62,13 +54,8 @@ export const TradingViewChart = forwardRef<
       interval = '1' as ResolutionString,
       containerId = 'tv_chart_container',
       libraryPath = '/charting_library/',
-      chartsStorageUrl = 'https://saveload.tradingview.com',
-      chartsStorageApiVersion = '1.1' as AvailableSaveloadVersions,
-      clientId = 'tradingview.com',
-      userId = 'public_user',
       fullscreen = false,
-      autosize = true,
-      studiesOverrides = defaultStudiesOverrides
+      autosize = true
     }: Omit<ChartContainerProps, 'symbol'>,
     ref
   ) => {
@@ -147,18 +134,12 @@ export const TradingViewChart = forwardRef<
               'use_localstorage_for_settings',
               'save_chart_properties_to_local_storage',
               'chart_property_page_style',
-              'chart_property_page_background'
+              'chart_property_page_background',
+              'study_templates',
+              'header_saveload'
             ] as ChartingLibraryFeatureset[],
-            enabled_features: [
-              'study_templates'
-            ] as ChartingLibraryFeatureset[],
-            charts_storage_url: chartsStorageUrl,
-            charts_storage_api_version: chartsStorageApiVersion,
-            client_id: clientId,
-            user_id: userId,
             fullscreen: fullscreen,
             autosize: autosize,
-            studies_overrides: studiesOverrides,
             theme: chartTheme as ThemeName,
             // Force the interval more explicitly
             time_frames: [
