@@ -6,7 +6,6 @@ import { Inter } from 'next/font/google';
 
 import { Providers } from '@/app/providers';
 import { Navbar } from '@/components/ui/navbar';
-import { Toaster } from '@/components/ui/sonner';
 import { AppInfo } from '@/constants/app-info';
 import { getBaseUrl } from '@/lib/urls/get-base-url';
 
@@ -52,9 +51,6 @@ export default async function RootLayout({
         <Providers>
           <Navbar />
           {children}
-          <React.Suspense>
-            <Toaster />
-          </React.Suspense>
         </Providers>
       </body>
     </html>
